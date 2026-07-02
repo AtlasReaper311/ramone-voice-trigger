@@ -1,0 +1,29 @@
+# Voice deploy: "Ramone, deploy atlas systems" (or trigger / push).
+#
+# Place at: config/automations/voice-trigger.yaml
+# (or paste into the automations editor in YAML mode; if automations
+# live in a single automations.yaml, append this list entry there.)
+#
+# The {repo} slot resolves through the list in
+# custom_sentences/en/github.yaml, so trigger.slots.repo arrives as
+# the repo slug, already normalised.
+- id: atlas_voice_deploy
+  alias: "Atlas: deploy by voice"
+  description: >-
+    Fires ramone-trigger when a deploy sentence is heard. Discord
+    carries the result; the spoken response only confirms the trigger.
+  mode: queued
+  max: 5
+  triggers:
+    - trigger: conversation
+      command:
+        - "deploy {repo}"
+        - "trigger {repo}"
+        - "push {repo}"
+  actions:
+    - action: script.github_trigger
+      data:
+        repo: "{{ trigger.slots.repo }}"
+    - set_conversation_response: >-
+        Deploy triggered for {{ trigger.slots.repo }}. Discord will
+        report the result.

@@ -1,0 +1,19 @@
+# The HTTP layer Home Assistant does not have natively: rest_command
+# is what actually POSTs to the Worker. The three specced files cannot
+# express this, hence a fourth.
+#
+# Wire it in configuration.yaml as:
+#   rest_command: !include rest-commands/github.yaml
+# (or merge into an existing rest_command block), and add to
+# secrets.yaml:
+#   ramone_trigger_secret: "<same value as wrangler secret TRIGGER_SECRET>"
+github_trigger:
+  url: "https://api.atlas-systems.uk/trigger"
+  method: POST
+  headers:
+    x-trigger-secret: !secret ramone_trigger_secret
+  content_type: "application/json"
+  payload: '{"repo": "{{ repo }}"}'
+  # The Worker answers in ~2-4s (dispatch plus a quick run lookup);
+  # 15s covers a slow GitHub without the automation feeling hung.
+  timeout: 15

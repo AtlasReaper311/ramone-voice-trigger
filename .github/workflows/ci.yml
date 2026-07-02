@@ -1,0 +1,72 @@
+# CI gate for ramone-voice-trigger: parse-check the Worker as ES
+# modules and validate the HA YAML, report to #ci-cd via direct curl.
+# Deploys go through the reusable deploy-worker caller (see README).
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Parse-check the Worker (ES modules)
+        run: |
+          for f in worker/src/*.js; do
+            echo "checking $f"
+            node --input-type=module --check < "$f"
+          done
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate HA YAML (tolerating !secret)
+        run: |
+          pip install --quiet pyyaml
+          python - <<'PY'
+          import glob, yaml
+          class HA(yaml.SafeLoader):
+              pass
+          HA.add_constructor("!secret", lambda loader, node: f"secret:{node.value}")
+          HA.add_constructor("!include", lambda loader, node: f"include:{node.value}")
+          for path in glob.glob("ha-config/**/*.yaml", recursive=True):
+              yaml.load(open(path), Loader=HA)
+              print("ok", path)
+          PY
+
+      - name: Notify #ci-cd
+        if: always()
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_CICD_WEBHOOK }}
+          STATUS: ${{ job.status }}
+        run: |
+          [ -z "$WEBHOOK" ] && echo "no webhook secret; skipping" && exit 0
+          if [ "$STATUS" = "success" ]; then COLOUR=4906624; ICON="🟢"; else COLOUR=14830410; ICON="🔴"; fi
+          RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          PAYLOAD=$(jq -n \
+            --arg icon "$ICON" \
+            --arg status "$STATUS" \
+            --arg run_url "$RUN_URL" \
+            --argjson colour "$COLOUR" \
+            '{
+              username: "ci-cd",
+              embeds: [{
+                title: "ramone-voice-trigger CI",
+                description: ($icon + " worker parse-check + HA yaml: " + $status),
+                color: $colour,
+                fields: [{name: "Run", value: ("[logs](" + $run_url + ")"), inline: true}],
+                footer: {text: "Atlas Systems — Pipeline"}
+              }]
+            }')
+          curl -sS -X POST "$WEBHOOK" -H "Content-Type: application/json" -d "$PAYLOAD"

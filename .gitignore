@@ -1,0 +1,8 @@
+# Secrets and local config
+.env
+.dev.vars
+
+# Worker toolchain
+node_modules/
+.wrangler/
+dist/

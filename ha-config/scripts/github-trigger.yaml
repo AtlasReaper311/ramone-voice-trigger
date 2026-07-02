@@ -1,0 +1,20 @@
+# Script wrapper around the rest_command so the voice automation, the
+# UI, and any future caller share one entry point (and one place to
+# add logic later, e.g. per-repo confirmation).
+#
+# Place at: config/scripts/github-trigger.yaml
+# (or paste into scripts.yaml; the top-level key is the script name.)
+github_trigger:
+  alias: "Atlas: fire ramone-trigger"
+  description: Dispatch an allowlisted repo's workflow via the Worker.
+  fields:
+    repo:
+      description: Repo slug as allowlisted by ramone-trigger
+      example: atlas-systems
+      required: true
+      selector:
+        text:
+  sequence:
+    - action: rest_command.github_trigger
+      data:
+        repo: "{{ repo }}"

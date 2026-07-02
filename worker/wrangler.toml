@@ -1,0 +1,47 @@
+# ramone-trigger // Cloudflare Worker configuration
+#
+# Owns api.atlas-systems.uk/trigger*, more specific than atlas-notify's
+# /* wildcard, so Cloudflare routes it here (site-pulse precedent).
+name = "ramone-trigger"
+main = "src/index.js"
+compatibility_date = "2026-06-01"
+# Reachable only on the routed production hostname: one URL, one auth
+# surface.
+workers_dev = false
+
+routes = [
+  { pattern = "api.atlas-systems.uk/trigger*", zone_id = "8ba6350a78c988447c111048b125f917" }
+]
+
+[observability]
+enabled = true
+
+[vars]
+GITHUB_OWNER = "AtlasReaper311"
+# repo → default dispatch target. atlas-notify deploys via workflow_run
+# after CI succeeds, so its dispatch target is ci.yml and the estate's
+# own chain does the deploy. If any repo's caller file is named
+# differently, fix it here and redeploy; the mapping is the single
+# source of truth for what voice can touch.
+REPO_ALLOWLIST = '{"atlas-systems":"deploy.yml","atlas-notify":"ci.yml","github-pulse":"deploy.yml","site-pulse":"deploy.yml","atlas-vault":"deploy.yml","ramone-edge":"deploy.yml"}'
+# Fast pre-response run lookup (keeps Home Assistant's rest_command
+# well inside its timeout), then the background completion watch.
+RESOLVE_ATTEMPTS = "2"
+RESOLVE_DELAY_MS = "1500"
+WATCH_TIMEOUT_S = "120"
+WATCH_INTERVAL_S = "10"
+# Set to route these events to a dedicated channel once atlas-notify
+# learns the class; empty means the generic alert path.
+NOTIFY_SIGNAL_CLASS = ""
+
+# atlas-notify over a Service Binding: Worker-to-Worker inside
+# Cloudflare's network, no public internet hop.
+[[services]]
+binding = "ATLAS_NOTIFY"
+service = "atlas-notify"
+
+# Secrets (never in this file, never in source):
+#   npx wrangler secret put TRIGGER_SECRET
+#   npx wrangler secret put GITHUB_TOKEN
+#   npx wrangler secret put NOTIFY_TOKEN
+# For local dev, copy .dev.vars.example to .dev.vars instead.

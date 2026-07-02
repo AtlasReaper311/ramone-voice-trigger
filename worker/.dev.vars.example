@@ -1,0 +1,6 @@
+# Local dev secrets for `npx wrangler dev`. Copy to .dev.vars.
+TRIGGER_SECRET=
+GITHUB_TOKEN=
+# Dev has no service binding; the notify module falls back to this URL.
+NOTIFY_URL=https://api.atlas-systems.uk/notify
+NOTIFY_TOKEN=

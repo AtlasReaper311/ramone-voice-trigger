@@ -1,0 +1,25 @@
+# Shared slot list for the deploy sentences. Lists defined under
+# config/custom_sentences are available to sentence triggers in
+# automations; each spoken name maps out to the exact repo slug the
+# Worker allowlists, so pronunciation and slugs stay decoupled.
+#
+# Place at: config/custom_sentences/en/github.yaml
+#
+# Adding a repo is a two-line change here plus one entry in the
+# Worker's REPO_ALLOWLIST var.
+language: "en"
+lists:
+  repo:
+    values:
+      - in: "atlas systems"
+        out: "atlas-systems"
+      - in: "atlas notify"
+        out: "atlas-notify"
+      - in: "github pulse"
+        out: "github-pulse"
+      - in: "site pulse"
+        out: "site-pulse"
+      - in: "atlas vault"
+        out: "atlas-vault"
+      - in: "ramone edge"
+        out: "ramone-edge"

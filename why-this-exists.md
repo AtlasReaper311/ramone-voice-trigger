@@ -1,0 +1,11 @@
+# Why this exists
+
+Voice-controlled deployment sounds like a party trick, and if it were implemented as a party trick it would be one: a speech model wired straight to a shell command, all novelty and blast radius. That is not what this is. The deploy path here existed before voice did: push-triggered workflows, reusable callers, scoped tokens, Discord reporting. This repo adds a single authenticated client to that path. The pipeline does not know or care that the request originated as sound waves in a flat in Dundee.
+
+That distinction is the pattern worth keeping. Interfaces multiply; capabilities should not. `workflow_dispatch` is GitHub's admission that pipelines need callers other than git push, and once a capability is an API, every new interface to it is a thin adapter: a webhook, a chat command, a cron, a voice intent. Each adapter carries its own authentication and its own narrow permission, while the capability itself stays in one place with one implementation and one audit trail. The alternative, teaching each interface to deploy in its own way, is how estates rot.
+
+The security model follows from treating voice as just another untrusted client. The sentence is parsed locally, the request carries a shared secret compared without timing leaks, the Worker holds an allowlist mapping each repo to the one workflow voice may start, and the PAT behind it is fine-grained to Actions on six named repos. Full compromise of every layer yields the ability to redeploy main, which every push already does. Designing the failure case first is what separates an infrastructure pattern from a demo.
+
+There is also an honest ergonomic argument. Deploys happen at the end of work, when hands are on a keyboard that is already mid-commit, or across the room entirely. "Ramone, deploy atlas systems" closes the loop without a context switch, and the two Discord embeds, one when the run starts and one when it concludes, mean the confirmation arrives on the same channel every other pipeline event already uses. The assistant does not replace the pipeline's reporting; it borrows it.
+
+The transferable principle: build capabilities as APIs and interfaces as clients. When the day comes to add the next trigger, a phone widget, a scheduled redeploy, a chat bot, the estate will already know how, because voice will have proven the seam.
