@@ -136,6 +136,54 @@ This is the Ramone subsystem reaching into the pipeline: [`ramone-edge`](https:/
 
 Voice here is not a feature, it is a client; when deployment is already an authenticated API, every new interface to it is a thin adapter, and that is the payoff of building the pipeline first.
 
+## Troubleshooting
+
+### "unauthorised" with a secret you're sure is correct
+
+You're almost certainly hitting a PowerShell quoting issue, not 
+an actual auth bug. Native Windows PowerShell mangles `$` and 
+backtick characters inside double-quoted strings before curl 
+ever sees them — so a secret containing either can differ 
+between what you typed and what got sent, even on an exact 
+copy-paste.
+
+**Fix:** always test with `Invoke-RestMethod` and a hashtable 
+header, never `curl.exe` with an inline double-quoted secret:
+
+```powershell
+Invoke-RestMethod -Uri https://api.atlas-systems.uk/trigger `
+  -Method POST `
+  -Headers @{ "x-trigger-secret" = "YOUR_SECRET_HERE" } `
+  -ContentType "application/json" `
+  -Body (@{ repo = "atlas-systems" } | ConvertTo-Json)
+```
+
+If you must use `curl.exe`, escape inner double quotes manually:
+```powershell
+curl.exe -X POST https://api.atlas-systems.uk/trigger `
+  -H "x-trigger-secret: YOUR_SECRET" `
+  -d '{\"repo\":\"atlas-systems\"}'
+```
+
+WSL bash doesn't have this problem — only native PowerShell.
+
+### Rotating TRIGGER_SECRET
+
+```powershell
+cd L:\Atlas-Systems\ramone-voice-trigger\worker
+npx wrangler secret put TRIGGER_SECRET
+```
+
+Paste the new value at the interactive prompt only. Never pass 
+it as a command-line argument, never paste it into a chat client 
+or issue tracker — if it's ever exposed outside this prompt, 
+rotate again immediately, don't just stop using it.
+
+Generate a strong random value first if needed:
+```powershell
+-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 40 | ForEach-Object {[char]$_})
+```
+
 ---
 
 Part of [atlas-systems.uk](https://atlas-systems.uk)
