@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   deploy:
-    uses: AtlasReaper311/atlas-infra/.github/workflows/deploy-worker.yml@61708c4dc639d2544a1a5e7063efcccdf96988cc # atlas-infra main
+    uses: AtlasReaper311/atlas-infra/.github/workflows/deploy-worker.yml@d05564499b1f6822430f9427a451207cc06ebe4f # atlas-infra main
     with:
       worker_name: ramone-trigger
       working_directory: worker
