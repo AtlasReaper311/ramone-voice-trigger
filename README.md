@@ -143,7 +143,7 @@ Voice here is not a feature, it is a client; when deployment is already an authe
 You're almost certainly hitting a PowerShell quoting issue, not 
 an actual auth bug. Native Windows PowerShell mangles `$` and 
 backtick characters inside double-quoted strings before curl 
-ever sees them — so a secret containing either can differ 
+ever sees them, so a secret containing either can differ
 between what you typed and what got sent, even on an exact 
 copy-paste.
 
@@ -165,7 +165,7 @@ curl.exe -X POST https://api.atlas-systems.uk/trigger `
   -d '{\"repo\":\"atlas-systems\"}'
 ```
 
-WSL bash doesn't have this problem — only native PowerShell.
+WSL bash doesn't have this problem. Only native PowerShell.
 
 ### Rotating TRIGGER_SECRET
 
@@ -176,7 +176,7 @@ npx wrangler secret put TRIGGER_SECRET
 
 Paste the new value at the interactive prompt only. Never pass 
 it as a command-line argument, never paste it into a chat client 
-or issue tracker — if it's ever exposed outside this prompt, 
+or issue tracker. If it's ever exposed outside this prompt,
 rotate again immediately, don't just stop using it.
 
 Generate a strong random value first if needed:
