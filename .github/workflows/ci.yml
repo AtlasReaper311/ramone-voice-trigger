@@ -27,6 +27,8 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0, Node 24
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
 
       - name: Parse-check the Worker (ES modules)
         run: |
@@ -34,6 +36,27 @@ jobs:
             echo "checking $f"
             node --input-type=module --check < "$f"
           done
+
+      - name: Build exact Worker deployment candidate
+        working-directory: worker
+        run: |
+          npm ci
+          npm run lint
+          npx wrangler deploy --dry-run --outdir dist
+
+      - name: Check out pinned Atlas Infra Worker contract validator
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0, Node 24
+        with:
+          repository: AtlasReaper311/atlas-infra
+          ref: f971172dc258c93dffa53b8b7a3532c5be55883d
+          path: .atlas-infra-contracts
+          persist-credentials: false
+
+      - name: Validate bundled Worker metadata contract
+        run: |
+          python3 .atlas-infra-contracts/scripts/worker_contract.py check \
+            --bundle-dir worker/dist \
+            --require-meta
 
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0, Node 24
         with:
