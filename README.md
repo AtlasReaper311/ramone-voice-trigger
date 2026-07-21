@@ -130,24 +130,18 @@ The blast radius of full compromise is therefore: someone can redeploy main. The
 
 **No run id from dispatch.** GitHub answers `workflow_dispatch` with 204 and silence; the run is found by listing recent runs for that workflow filtered to the branch and event, newest first, created at or after the dispatch (with 5s of clock-skew allowance).
 
-## How it fits into Atlas Systems
-
-This is the Ramone subsystem reaching into the pipeline: [`ramone-edge`](https://github.com/AtlasReaper311/ramone-edge) made Ramone publicly askable, and this makes Ramone operationally useful. Events flow through [`atlas-notify`](https://github.com/AtlasReaper311/atlas-notify) over a Service Binding like every other Worker-to-Worker call in the estate, the `/_meta` endpoint makes it discoverable to [`atlas-api-index`](https://github.com/AtlasReaper311/atlas-api-index), and the workflows it fires are the same reusable callers the whole estate deploys through.
-
-Voice here is not a feature, it is a client; when deployment is already an authenticated API, every new interface to it is a thin adapter, and that is the payoff of building the pipeline first.
-
 ## Troubleshooting
 
 ### "unauthorised" with a secret you're sure is correct
 
-You're almost certainly hitting a PowerShell quoting issue, not 
-an actual auth bug. Native Windows PowerShell mangles `$` and 
-backtick characters inside double-quoted strings before curl 
+You're almost certainly hitting a PowerShell quoting issue, not
+an actual auth bug. Native Windows PowerShell mangles `$` and
+backtick characters inside double-quoted strings before curl
 ever sees them, so a secret containing either can differ
-between what you typed and what got sent, even on an exact 
+between what you typed and what got sent, even on an exact
 copy-paste.
 
-**Fix:** always test with `Invoke-RestMethod` and a hashtable 
+**Fix:** always test with `Invoke-RestMethod` and a hashtable
 header, never `curl.exe` with an inline double-quoted secret:
 
 ```powershell
@@ -159,6 +153,7 @@ Invoke-RestMethod -Uri https://api.atlas-systems.uk/trigger `
 ```
 
 If you must use `curl.exe`, escape inner double quotes manually:
+
 ```powershell
 curl.exe -X POST https://api.atlas-systems.uk/trigger `
   -H "x-trigger-secret: YOUR_SECRET" `
@@ -174,15 +169,22 @@ cd L:\Atlas-Systems\ramone-voice-trigger\worker
 npx wrangler secret put TRIGGER_SECRET
 ```
 
-Paste the new value at the interactive prompt only. Never pass 
-it as a command-line argument, never paste it into a chat client 
+Paste the new value at the interactive prompt only. Never pass
+it as a command-line argument, never paste it into a chat client
 or issue tracker. If it's ever exposed outside this prompt,
 rotate again immediately, don't just stop using it.
 
 Generate a strong random value first if needed:
+
 ```powershell
 -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 40 | ForEach-Object {[char]$_})
 ```
+
+## How it fits into Atlas Systems
+
+This is the Ramone subsystem reaching into the pipeline: [`ramone-edge`](https://github.com/AtlasReaper311/ramone-edge) made Ramone publicly askable, and this makes Ramone operationally useful. Events flow through [`atlas-notify`](https://github.com/AtlasReaper311/atlas-notify) over a Service Binding like every other Worker-to-Worker call in the estate, the `/_meta` endpoint makes it discoverable to [`atlas-api-index`](https://github.com/AtlasReaper311/atlas-api-index), and the workflows it fires are the same reusable callers the whole estate deploys through.
+
+Voice here is not a feature, it is a client; when deployment is already an authenticated API, every new interface to it is a thin adapter, and that is the payoff of building the pipeline first.
 
 ---
 
