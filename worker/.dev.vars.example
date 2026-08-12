@@ -1,6 +1,10 @@
 # Local dev secrets for `npx wrangler dev`. Copy to .dev.vars.
 TRIGGER_SECRET=
+RAMONE_GITHUB_APP_CLIENT_ID=
+RAMONE_GITHUB_APP_INSTALLATION_ID=
+RAMONE_GITHUB_APP_PRIVATE_KEY=
 GITHUB_TOKEN=
 # Dev has no service binding; the notify module falls back to this URL.
 NOTIFY_URL=https://api.atlas-systems.uk/notify
 NOTIFY_TOKEN=
+NOTIFY_SIGNAL_CLASS=ramone
