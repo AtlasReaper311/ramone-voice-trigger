@@ -15,6 +15,8 @@ export default [
         console: "readonly",
         AbortSignal: "readonly",
         crypto: "readonly",
+        atob: "readonly",
+        btoa: "readonly",
       },
     },
     rules: {

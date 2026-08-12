@@ -33,7 +33,7 @@
 ## Prerequisites
 
 - The Worker estate as it stands (atlas-notify live; this binds to it)
-- A fine-grained GitHub PAT: **Actions read and write** on the six allowlisted repos, nothing else
+- A GitHub App installed on the six allowlisted repos with **Actions read and write**. A fine-grained PAT with the same scope can remain as a temporary fallback during migration.
 - Home Assistant with Assist and the Ramone wake word working
 - `wrangler` authenticated; `npm` for the lint step
 
@@ -54,13 +54,18 @@ atlas-notify is the special case: its deploy runs via `workflow_run` after CI su
 
 ### 2. Deploy the Worker
 
+Create `ramone-workflow-dispatcher` as a GitHub App with webhooks disabled, no user authorization, and repository permission **Actions: read and write**. Install it only on the repos listed in `REPO_ALLOWLIST`. Set the App Client ID and installation ID in `worker/wrangler.toml`, then store the private key as a Wrangler secret named `RAMONE_GITHUB_APP_PRIVATE_KEY`.
+
+The Worker accepts GitHub's normal `BEGIN RSA PRIVATE KEY` download and PKCS8 `BEGIN PRIVATE KEY` PEM. Paste the key only into the Wrangler secret prompt, never into source or chat.
+
 ```bash
 cd worker
 npm ci
 npx eslint .
 npx wrangler secret put TRIGGER_SECRET
-npx wrangler secret put GITHUB_TOKEN
+npx wrangler secret put RAMONE_GITHUB_APP_PRIVATE_KEY
 npx wrangler secret put NOTIFY_TOKEN
+npx wrangler secret put GITHUB_TOKEN   # temporary fallback only
 npx wrangler deploy
 ```
 
@@ -118,7 +123,7 @@ The Worker's allowlist is the single source of truth for what voice can touch; t
 
 ## Security model
 
-Concentric gates, smallest surface first. One path, one method. A shared secret in a header, compared digest-to-digest so the check leaks neither content nor length through timing. An allowlist mapping each repo to its dispatchable workflow, so a stolen secret can only re-run pipelines that already run on every push; it cannot touch a new repo, and it cannot run arbitrary workflow files against the estate without an explicit mapping. Behind all of that, a fine-grained PAT scoped to Actions on six named repos, stored as a Worker secret on the runtime credential path, never in GitHub Actions, never in source.
+Concentric gates, smallest surface first. One path, one method. A shared secret in a header, compared digest-to-digest so the check leaks neither content nor length through timing. An allowlist mapping each repo to its dispatchable workflow, so a stolen secret can only re-run pipelines that already run on every push; it cannot touch a new repo, and it cannot run arbitrary workflow files against the estate without an explicit mapping. Behind all of that, the Worker mints a short-lived GitHub App installation token scoped to Actions on six named repos. A fine-grained PAT fallback can stay briefly during cutover, but the App path should become the steady-state credential.
 
 The blast radius of full compromise is therefore: someone can redeploy main. The pipelines' own checks still gate what main deploys.
 

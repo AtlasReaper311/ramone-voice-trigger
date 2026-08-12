@@ -18,6 +18,8 @@ enabled = true
 
 [vars]
 GITHUB_OWNER = "AtlasReaper311"
+RAMONE_GITHUB_APP_CLIENT_ID = "Iv23li6N4hgUjzhmADah"
+RAMONE_GITHUB_APP_INSTALLATION_ID = "153185552"
 # repo → default dispatch target. atlas-notify deploys via workflow_run
 # after CI succeeds, so its dispatch target is ci.yml and the estate's
 # own chain does the deploy. If any repo's caller file is named
@@ -30,9 +32,8 @@ RESOLVE_ATTEMPTS = "2"
 RESOLVE_DELAY_MS = "1500"
 WATCH_TIMEOUT_S = "120"
 WATCH_INTERVAL_S = "10"
-# Set to route these events to a dedicated channel once atlas-notify
-# learns the class; empty means the generic alert path.
-NOTIFY_SIGNAL_CLASS = ""
+# Route voice trigger lifecycle events to the Ramone channel.
+NOTIFY_SIGNAL_CLASS = "ramone"
 
 # atlas-notify over a Service Binding: Worker-to-Worker inside
 # Cloudflare's network, no public internet hop.
@@ -42,6 +43,7 @@ service = "atlas-notify"
 
 # Secrets (never in this file, never in source):
 #   npx wrangler secret put TRIGGER_SECRET
-#   npx wrangler secret put GITHUB_TOKEN
+#   npx wrangler secret put RAMONE_GITHUB_APP_PRIVATE_KEY
 #   npx wrangler secret put NOTIFY_TOKEN
+#   npx wrangler secret put GITHUB_TOKEN   # temporary fallback during migration
 # For local dev, copy .dev.vars.example to .dev.vars instead.

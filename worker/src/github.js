@@ -10,11 +10,187 @@
  */
 
 const API = "https://api.github.com";
+const TOKEN_REFRESH_SKEW_MS = 60 * 1000;
+
+let installationTokenCache = null;
+
+function base64UrlBytes(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64UrlJson(value) {
+  return base64UrlBytes(new TextEncoder().encode(JSON.stringify(value)));
+}
+
+function concatBytes(parts) {
+  const size = parts.reduce((total, part) => total + part.length, 0);
+  const output = new Uint8Array(size);
+  let offset = 0;
+  for (const part of parts) {
+    output.set(part, offset);
+    offset += part.length;
+  }
+  return output;
+}
+
+function derLength(length) {
+  if (length < 128) return Uint8Array.of(length);
+  const bytes = [];
+  let remaining = length;
+  while (remaining > 0) {
+    bytes.unshift(remaining & 0xff);
+    remaining >>= 8;
+  }
+  return Uint8Array.of(0x80 | bytes.length, ...bytes);
+}
+
+function derTagged(tag, body) {
+  return concatBytes([Uint8Array.of(tag), derLength(body.length), body]);
+}
+
+function derSequence(parts) {
+  return derTagged(0x30, concatBytes(parts));
+}
+
+function derOctetString(body) {
+  return derTagged(0x04, body);
+}
+
+function rsaPrivateKeyToPkcs8(pkcs1Bytes) {
+  const version = Uint8Array.of(0x02, 0x01, 0x00);
+  const rsaEncryptionOid = Uint8Array.of(
+    0x06,
+    0x09,
+    0x2a,
+    0x86,
+    0x48,
+    0x86,
+    0xf7,
+    0x0d,
+    0x01,
+    0x01,
+    0x01,
+  );
+  const algorithm = derSequence([rsaEncryptionOid, Uint8Array.of(0x05, 0x00)]);
+  return derSequence([version, algorithm, derOctetString(pkcs1Bytes)]).buffer;
+}
+
+function decodePem(pem, label) {
+  const body = pem
+    .replace(`-----BEGIN ${label}-----`, "")
+    .replace(`-----END ${label}-----`, "")
+    .replace(/\s+/g, "");
+  const binary = atob(body);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function pemToArrayBuffer(pem) {
+  if (pem.includes("-----BEGIN PRIVATE KEY-----")) {
+    return decodePem(pem, "PRIVATE KEY").buffer;
+  }
+  if (pem.includes("-----BEGIN RSA PRIVATE KEY-----")) {
+    return rsaPrivateKeyToPkcs8(decodePem(pem, "RSA PRIVATE KEY"));
+  }
+  throw new Error(
+    "RAMONE_GITHUB_APP_PRIVATE_KEY must be a PKCS8 or RSA private key PEM",
+  );
+}
+
+function usesGitHubApp(env) {
+  return Boolean(
+    env.RAMONE_GITHUB_APP_CLIENT_ID &&
+      env.RAMONE_GITHUB_APP_INSTALLATION_ID &&
+      env.RAMONE_GITHUB_APP_PRIVATE_KEY,
+  );
+}
+
+async function createAppJwt(env) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: "RS256", typ: "JWT" };
+  const payload = {
+    iat: now - 60,
+    exp: now + 9 * 60,
+    iss: env.RAMONE_GITHUB_APP_CLIENT_ID,
+  };
+  const unsigned = `${base64UrlJson(header)}.${base64UrlJson(payload)}`;
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    pemToArrayBuffer(env.RAMONE_GITHUB_APP_PRIVATE_KEY),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    new TextEncoder().encode(unsigned),
+  );
+  return `${unsigned}.${base64UrlBytes(new Uint8Array(signature))}`;
+}
+
+async function mintInstallationToken(env) {
+  const now = Date.now();
+  if (
+    installationTokenCache &&
+    installationTokenCache.clientId === env.RAMONE_GITHUB_APP_CLIENT_ID &&
+    installationTokenCache.installationId === env.RAMONE_GITHUB_APP_INSTALLATION_ID &&
+    installationTokenCache.expiresAtMs - now > TOKEN_REFRESH_SKEW_MS
+  ) {
+    return installationTokenCache.token;
+  }
+
+  const jwt = await createAppJwt(env);
+  const response = await fetch(
+    `${API}/app/installations/${env.RAMONE_GITHUB_APP_INSTALLATION_ID}/access_tokens`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${jwt}`,
+        accept: "application/vnd.github+json",
+        "x-github-api-version": "2022-11-28",
+        "user-agent": "ramone-trigger/1.0",
+      },
+    },
+  );
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 300);
+    throw new Error(`GitHub ${response.status} minting installation token: ${detail}`);
+  }
+  const payload = await response.json();
+  if (
+    typeof payload.token !== "string" ||
+    typeof payload.expires_at !== "string"
+  ) {
+    throw new Error("GitHub installation token response was malformed");
+  }
+  const expiresAtMs = Date.parse(payload.expires_at);
+  if (Number.isNaN(expiresAtMs)) {
+    throw new Error("GitHub installation token expiry was malformed");
+  }
+  installationTokenCache = {
+    clientId: env.RAMONE_GITHUB_APP_CLIENT_ID,
+    installationId: env.RAMONE_GITHUB_APP_INSTALLATION_ID,
+    token: payload.token,
+    expiresAtMs,
+  };
+  return installationTokenCache.token;
+}
+
+async function githubToken(env) {
+  if (usesGitHubApp(env)) return mintInstallationToken(env);
+  if (env.GITHUB_TOKEN) return env.GITHUB_TOKEN;
+  throw new Error("GitHub credential is not configured");
+}
 
 /** Standard headers for every GitHub call; a UA is mandatory. */
-function ghHeaders(env) {
+async function ghHeaders(env) {
+  const token = await githubToken(env);
   return {
-    authorization: `Bearer ${env.GITHUB_TOKEN}`,
+    authorization: `Bearer ${token}`,
     accept: "application/vnd.github+json",
     "x-github-api-version": "2022-11-28",
     "user-agent": "ramone-trigger/1.0",
@@ -32,9 +208,10 @@ export function sleep(ms) {
  */
 export async function dispatchWorkflow(env, repo, workflow, ref) {
   const url = `${API}/repos/${env.GITHUB_OWNER}/${repo}/actions/workflows/${workflow}/dispatches`;
+  const headers = await ghHeaders(env);
   const response = await fetch(url, {
     method: "POST",
-    headers: { ...ghHeaders(env), "content-type": "application/json" },
+    headers: { ...headers, "content-type": "application/json" },
     body: JSON.stringify({ ref }),
   });
   if (response.status === 204) return;
@@ -67,7 +244,7 @@ export async function resolveRun(env, repo, workflow, ref, sinceIso, attempts, d
   for (let attempt = 1; attempt <= attempts; attempt++) {
     await sleep(delayMs);
     try {
-      const response = await fetch(url, { headers: ghHeaders(env) });
+      const response = await fetch(url, { headers: await ghHeaders(env) });
       if (!response.ok) {
         console.log(`resolveRun: GitHub ${response.status} on attempt ${attempt}`);
         continue;
@@ -88,7 +265,7 @@ export async function resolveRun(env, repo, workflow, ref, sinceIso, attempts, d
  */
 export async function getRun(env, repo, runId) {
   const url = `${API}/repos/${env.GITHUB_OWNER}/${repo}/actions/runs/${runId}`;
-  const response = await fetch(url, { headers: ghHeaders(env) });
+  const response = await fetch(url, { headers: await ghHeaders(env) });
   if (!response.ok) {
     throw new Error(`GitHub ${response.status} reading run ${runId}`);
   }

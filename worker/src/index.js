@@ -14,8 +14,9 @@
  *   - The repo must be allowlisted; the allowlist maps each repo to
  *     its dispatchable workflow, so a stolen secret can only re-run
  *     pipelines the estate already runs on push.
- *   - The GitHub PAT is fine-grained: Actions read/write on the six
- *     allowlisted repos, nothing else, set via wrangler secret.
+ *   - GitHub access prefers a short-lived App installation token scoped
+ *     to Actions read/write on the six allowlisted repos. The old
+ *     fine-grained PAT remains a temporary fallback during migration.
  *
  * Timing: Home Assistant's rest_command times out in seconds, so the
  * response goes back after at most a couple of quick run-lookup polls
