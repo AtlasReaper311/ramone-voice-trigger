@@ -89,10 +89,10 @@ function decodePem(pem, label) {
 }
 
 function pemToArrayBuffer(pem) {
-  if (pem.includes("-----BEGIN PRIVATE KEY-----")) {
+  if (pem.includes("-----BEGIN PRIVATE KEY-----")) { // secret-watch: ignore private-key-header
     return decodePem(pem, "PRIVATE KEY").buffer;
   }
-  if (pem.includes("-----BEGIN RSA PRIVATE KEY-----")) {
+  if (pem.includes("-----BEGIN RSA PRIVATE KEY-----")) { // secret-watch: ignore private-key-header
     return rsaPrivateKeyToPkcs8(decodePem(pem, "RSA PRIVATE KEY"));
   }
   throw new Error(
